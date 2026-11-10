@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stremio Watch History Importer</title>
+<style>
+  :root { --bg:#0f1420; --card:#1a2233; --ink:#e8edf6; --mut:#9fb0c9; --acc:#e0203c; --ok:#2ecc71; --warn:#f1c40f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:18px 24px; background:linear-gradient(90deg,#141b2b,#1e2740); border-bottom:1px solid #263149; }
+  h1 { margin:0; font-size:20px; } .sub { color:var(--mut); font-size:13px; margin-top:4px; }
+  .wrap { max-width:960px; margin:0 auto; padding:20px 24px 60px; }
+  .card { background:var(--card); border:1px solid #263149; border-radius:12px; padding:18px 20px; margin:16px 0; }
+  .card h2 { margin:0 0 8px; font-size:16px; } .step { color:var(--acc); font-weight:700; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 0; }
+  .tab { padding:8px 14px; border-radius:8px; background:#141b2b; border:1px solid #2a3550; color:var(--ink); cursor:pointer; font-size:14px; }
+  .tab.active { background:var(--acc); border-color:var(--acc); color:#fff; }
+  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  input[type=text], input[type=password], textarea { width:100%; padding:9px 11px; border-radius:8px; border:1px solid #2a3550; background:#0d1320; color:var(--ink); font-size:14px; font-family:inherit; }
+  textarea { resize:vertical; }
+  button { padding:9px 16px; border-radius:8px; border:0; background:var(--acc); color:#fff; font-weight:600; cursor:pointer; font-size:14px; }
+  button.ghost { background:#222d45; } button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .drop { border:2px dashed #33436a; border-radius:12px; padding:26px; text-align:center; color:var(--mut); cursor:pointer; }
+  .drop.drag { border-color:var(--acc); color:var(--ink); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; background:#22314c; color:var(--mut); }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .err { color:#ff6b6b; }
+  pre { background:#0a0f1a; border:1px solid #223; border-radius:10px; padding:12px; max-height:320px; overflow:auto; font-size:12px; line-height:1.45; white-space:pre-wrap; }
+  .bar { height:8px; background:#223; border-radius:6px; overflow:hidden; } .bar > i { display:block; height:100%; width:0; background:var(--acc); transition:width .2s; }
+  .muted { color:var(--mut); font-size:13px; } a { color:#7db1ff; }
+  .note { background:#14243a; border-left:3px solid #3d6ea5; padding:8px 12px; border-radius:6px; font-size:13px; color:#cfe0f5; margin:8px 0; }
+  .hidden { display:none; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .grid{ grid-template-columns:1fr; } }
+  code { background:#0d1320; padding:1px 5px; border-radius:4px; }
+</style>
+
+</head>
+<body>
+<header>
+  <h1>Stremio Watch History Importer</h1>
+  <div class="sub">Bring your old watch history from Netflix, Crunchyroll, Disney+ &amp; Prime Video into Trakt — which then syncs to Stremio. Everything runs locally on your PC.</div>
+</header>
+<div class="wrap">
+
+  <div class="card" style="border-color:#3d6ea5">
+    <h2>Before you start</h2>
+    <ol style="margin:6px 0 0 18px; padding:0; line-height:1.7">
+      <li>Create a free <a href="https://trakt.tv" target="_blank">Trakt account</a>.</li>
+      <li>Sign up for <a href="https://trakt.tv/vip" target="_blank"><b>Trakt VIP</b></a>. <span class="muted">Only needed so you can create the API application used in Step 1. Once you have finished importing everything, you can cancel the VIP subscription.</span></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">1.</span> Connect Trakt</h2>
+    <div class="muted">Create an app at <a href="https://trakt.tv/oauth/applications/new" target="_blank">trakt.tv/oauth/applications/new</a>. In <b>Redirect URIs</b> put <code>urn:ietf:wg:oauth:2.0:oob</code>, leave the rest blank, click <b>Create</b>. Then paste the two values below.</div>
+    <div class="grid">
+      <div><label>Client ID</label><input id="cid" type="text" placeholder="from your Trakt app" /></div>
+      <div><label>Client Secret</label><input id="csec" type="password" placeholder="from your Trakt app" /></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="saveCfg">Save keys</button>
+      <button id="login" class="ghost">Log in to Trakt</button>
+      <span id="authState" class="pill">checking…</span>
+    </div>
+    <div id="deviceBox" class="card hidden" style="margin-top:12px; background:#0d1320">
+      <div>1) Open <a id="actLink" href="https://trakt.tv/activate" target="_blank">trakt.tv/activate</a> (logged into Trakt).</div>
+      <div>2) Enter this code: <b id="userCode" style="font-size:20px; letter-spacing:2px"></b></div>
+      <div class="muted" id="pollMsg">Waiting for you to approve…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2.</span> Choose a service</h2>
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-svc="netflix">Netflix</div>
+      <div class="tab" data-svc="crunchyroll">Crunchyroll</div>
+      <div class="tab" data-svc="disneyplus">Disney+</div>
+      <div class="tab" data-svc="amazon">Amazon Prime</div>
+    </div>
+    <div id="instructions" class="muted" style="margin-top:12px; line-height:1.55"></div>
+
+    <!-- Crunchyroll inline builder -->
+    <div id="crBuilder" class="hidden" style="margin-top:14px">
+      <div class="muted">After following the guide, paste your two values here and click <b>Build my script</b>, then <b>Copy script</b> — no file editing.</div>
+      <div class="grid">
+        <div><label>Account ID</label><input id="crId" type="text" placeholder="the id from the watch-history URL" /></div>
+        <div><label>Authorization (Bearer …)</label><input id="crAuth" type="text" placeholder="Bearer eyJ..." /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="crBuild" class="ghost">Build my script</button>
+        <button id="crCopy" class="ghost hidden">Copy script</button>
+        <span id="crCopyState" class="muted"></span>
+      </div>
+      <textarea id="crScript" class="hidden" rows="6" style="margin-top:10px" readonly></textarea>
+    </div>
+
+    <!-- Prime Video inline copy -->
+    <div id="pvBuilder" class="hidden" style="margin-top:14px">
+      <div class="muted">No values needed for Prime. Just copy the script below and paste it into the Console on your Prime Video watch-history page (see the guide).</div>
+      <div class="row" style="margin-top:10px">
+        <button id="pvCopy" class="ghost">Copy Prime script</button>
+        <span id="pvCopyState" class="muted"></span>
+      </div>
+      <textarea id="pvScript" class="hidden" rows="6" style="margin-top:10px" readonly></textarea>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3.</span> Upload your history file</h2>
+    <div id="drop" class="drop">Drag &amp; drop your file here, or click to browse.<br><span class="muted" id="acceptHint"></span></div>
+    <input id="file" type="file" class="hidden" />
+    <div id="profileBox" class="hidden" style="margin-top:12px">
+      <label>Disney+ profile (pick yours)</label>
+      <div class="row"><select id="profileSel" style="padding:8px;border-radius:8px;background:#0d1320;color:var(--ink);border:1px solid #2a3550"></select><button id="applyProfile" class="ghost">Use this profile</button></div>
+    </div>
+    <div id="parseState" class="muted" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">4.</span> Preview, then Import</h2>
+    <div class="note">Do <b>one streaming service at a time</b> — finish importing one, then come back and load the next. Large libraries can take a while to check (often several minutes) as it paces requests for Trakt's limits. You can cancel anytime.</div>
+    <div class="row">
+      <button id="dry" disabled>Preview (writes nothing)</button>
+      <button id="commit" class="ghost" disabled>Import to Trakt</button>
+      <button id="cancel" class="ghost hidden">Cancel</button>
+      <span id="runState" class="pill"></span>
+    </div>
+    <div class="bar" style="margin:12px 0"><i id="prog"></i></div>
+    <pre id="log">Log will appear here…</pre>
+    <div id="summary" class="muted"></div>
+    <div class="muted" style="margin-top:6px"><b>Confidence:</b> <span class="ok">High</span> = auto-imported. <span class="warn">Medium</span> = uncertain, review before trusting. Low / no-match = skipped.</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">5.</span> Send it to Stremio</h2>
+    <div class="muted">Your history is now on Trakt. To make it show in Stremio's library:</div>
+    <ol style="margin:6px 0 0 18px; padding:0; line-height:1.7">
+      <li>Open <a href="https://www.stremio.com/acc-settings" target="_blank">stremio.com/acc-settings</a>.</li>
+      <li>Go to the <b>Integrations</b> tab and make sure <b>Trakt</b> is authenticated.</li>
+      <li>Click the Trakt <b>Import</b> button (imports your whole Trakt history into Stremio; usable once every 24 hours).</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let service = 'netflix', parsedCount = 0, loggedIn = false, lastContent = null;
+
+const INSTR = {
+  netflix: 'Netflix (per profile): Account &rarr; Profiles &rarr; your profile &rarr; Viewing activity &rarr; scroll down &rarr; Download all. Upload the NetflixViewingActivity.csv below.',
+  crunchyroll: 'Crunchyroll: open the <a href="/crunchyroll-help.html" target="_blank"><b>Crunchyroll guide &raquo;</b></a> (new tab) to get your Account ID + Authorization. Then use the box below to build and copy your export script (no file editing). Running it in the Console downloads crunchyroll-history-full.json, which you upload below.',
+  disneyplus: 'Disney+ (New Zealand / Asia Pacific): Disney has no history page &mdash; you must request your data.<br>1) Go to <a href="https://privacy.thewaltdisneycompany.com/en/current-privacy-policy/data-subject-rights-portal/" target="_blank">Disney Data Subject Rights Portal</a>.<br>2) Scroll to <b>Asia Pacific Region</b>.<br>3) Next to <i>"For other Asia Pacific Region Residents not referenced above, go to:"</i> click <a href="https://privacyportal-de.onetrust.com/webform/64f077b5-2f93-429f-a005-c0206ec0738e/e8b0886c-bac5-4905-a28d-0e77ce7abcf4" target="_blank"><b>TWDC General Data Subject Rights</b></a>.<br>4) On the form: choose your <b>Country/Region</b>, request type <b>"Request my personal information"</b>, pick <b>"Disney Streaming Services (e.g. Disney+ and ESPN+)"</b>, enter your Disney <b>email</b> (twice) and <b>first/last name</b>, complete the <b>captcha</b>, and <b>Submit</b>.<br>5) Can take up to ~20 working days. When it arrives, convert PDF&rarr;CSV, upload below, then pick your profile.',
+  amazon: 'Amazon Prime (per profile): open the <a href="/primevideo-help.html" target="_blank"><b>Prime Video guide &raquo;</b></a> (new tab). Then copy the script below and paste it into the Console on your Prime watch-history page. It downloads primevideo-history.json, which you upload below.<br><span class="warn">Note: rows where Prime does not include the show name (e.g. "Season 1") cannot be matched.</span>'
+};
+const ACCEPT = { netflix: 'Expecting a .csv', crunchyroll: 'Expecting the exported .json', disneyplus: 'Expecting a .csv (convert from PDF first)', amazon: 'Expecting the exported .json' };
+
+function updateButtons(){ const enable = loggedIn && parsedCount > 0; $('#dry').disabled = !enable; $('#commit').disabled = !enable; }
+function setService(svc){ service = svc; document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.svc===svc)); $('#instructions').innerHTML = INSTR[svc]; $('#acceptHint').textContent = ACCEPT[svc]; $('#profileBox').classList.add('hidden'); $('#parseState').textContent=''; parsedCount=0; $('#crBuilder').classList.toggle('hidden', svc!=='crunchyroll'); $('#pvBuilder').classList.toggle('hidden', svc!=='amazon'); updateButtons(); }
+document.querySelectorAll('.tab').forEach(t=> t.addEventListener('click', ()=> setService(t.dataset.svc)));
+
+async function refreshStatus(){ try { const s = await (await fetch('/api/status')).json(); loggedIn = !!s.hasToken; $('#authState').innerHTML = s.hasToken ? '<span class="ok">Logged in &#10003;</span>' : (s.hasConfig ? 'Keys saved — click Log in' : 'Enter your keys'); } catch (e) {} updateButtons(); }
+refreshStatus();
+
+$('#saveCfg').onclick = async ()=>{ const r = await (await fetch('/api/save-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client_id:$('#cid').value,client_secret:$('#csec').value})})).json(); if(r.error) alert(r.error); else { $('#authState').textContent='Keys saved — click Log in'; } };
+
+let pollTimer=null;
+$('#login').onclick = async ()=>{ const r = await (await fetch('/api/auth-start',{method:'POST'})).json(); if(r.error){ alert(r.error); return; } $('#deviceBox').classList.remove('hidden'); $('#userCode').textContent = r.user_code; $('#actLink').href = r.verification_url; $('#pollMsg').innerHTML = 'Waiting for you to approve... (this can take a moment after you click Yes)'; clearInterval(pollTimer); const everyMs = Math.max((r.interval || 5), 5) * 1000 + 500; pollTimer = setInterval(async ()=>{ let p; try { p = await (await fetch('/api/auth-poll',{method:'POST'})).json(); } catch (e) { return; } if(p.status==='ok'){ clearInterval(pollTimer); $('#pollMsg').innerHTML='<span class="ok">Logged in &#10003;</span>'; setTimeout(()=>$('#deviceBox').classList.add('hidden'),1500); refreshStatus(); } else if(p.status==='error'){ clearInterval(pollTimer); $('#pollMsg').innerHTML='<span class="err">Login did not complete ('+(p.detail||'')+') — click Log in to try again.</span>'; } else if(p.status==='expired'){ clearInterval(pollTimer); $('#pollMsg').innerHTML='<span class="err">The code expired — click Log in for a fresh one.</span>'; } }, everyMs); };
+
+$('#crBuild').onclick = async ()=>{ const r = await (await fetch('/api/crunchyroll-script',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({auth:$('#crAuth').value.trim(), account_id:$('#crId').value.trim()})})).json(); $('#crScript').value = r.script; $('#crScript').classList.remove('hidden'); $('#crCopy').classList.remove('hidden'); $('#crCopyState').textContent = 'Script ready — click Copy, then paste into the Crunchyroll Console.'; };
+$('#crCopy').onclick = ()=> copyFrom('#crScript','#crCopyState');
+
+$('#pvCopy').onclick = async ()=>{ if(!$('#pvScript').value){ const r = await (await fetch('/api/primevideo-script')).json(); $('#pvScript').value = r.script; } $('#pvScript').classList.remove('hidden'); copyFrom('#pvScript','#pvCopyState'); };
+
+async function copyFrom(area, stateSel){ const el = $(area); el.classList.remove('hidden'); try { await navigator.clipboard.writeText(el.value); $(stateSel).innerHTML = '<span class="ok">Copied &#10003;</span>'; } catch (e) { el.select(); document.execCommand('copy'); $(stateSel).innerHTML = '<span class="ok">Copied &#10003;</span>'; } }
+
+const drop = $('#drop'), fileInput = $('#file');
+drop.onclick = ()=> fileInput.click();
+drop.ondragover = (e)=>{ e.preventDefault(); drop.classList.add('drag'); };
+drop.ondragleave = ()=> drop.classList.remove('drag');
+drop.ondrop = (e)=>{ e.preventDefault(); drop.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); };
+fileInput.onchange = ()=>{ if(fileInput.files[0]) handleFile(fileInput.files[0]); };
+async function handleFile(f){ $('#parseState').textContent = 'Reading '+f.name+' ...'; const text = await f.text(); lastContent = text; await doParse(text, null); }
+async function doParse(text, profile){ const r = await (await fetch('/api/parse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service, content:text, profile})})).json(); if(!r.ok){ $('#parseState').innerHTML = '<span class="err">'+r.error+'</span>'; return; } if(service==='disneyplus' && (!profile) && r.profiles){ const sel = $('#profileSel'); sel.innerHTML=''; Object.entries(r.profiles).sort((a,b)=>b[1]-a[1]).forEach(([pp,c])=>{ const o=document.createElement('option'); o.value=pp; o.textContent=pp+' ('+c+' rows)'; sel.appendChild(o); }); $('#profileBox').classList.remove('hidden'); $('#parseState').innerHTML = 'Found <b>'+Object.keys(r.profiles).length+'</b> profiles. Pick yours, then click "Use this profile".'; return; } parsedCount = r.count; $('#parseState').innerHTML = 'Parsed <b>'+r.count+'</b> items — '+r.counts.episodes+' episodes, '+r.counts.movies+' movies.' + (parsedCount>0 && !loggedIn ? ' <span class="warn">(log in to enable the buttons)</span>' : ''); updateButtons(); }
+$('#applyProfile').onclick = ()=>{ if(lastContent) doParse(lastContent, $('#profileSel').value); };
+
+function runMode(mode){ $('#log').textContent=''; $('#summary').textContent=''; $('#prog').style.width='0%'; $('#runState').textContent = mode==='commit' ? 'Importing…' : 'Previewing…'; $('#dry').disabled=true; $('#commit').disabled=true; $('#cancel').classList.remove('hidden');
+  const es = new EventSource('/api/run?mode='+mode);
+  es.addEventListener('log', e=>{ const line = JSON.parse(e.data); const el=$('#log'); el.textContent += line+'\n'; el.scrollTop = el.scrollHeight; });
+  es.addEventListener('progress', e=>{ const d = JSON.parse(e.data); $('#prog').style.width = Math.round(d.done/d.total*100)+'%'; });
+  es.addEventListener('done', e=>{ es.close(); $('#cancel').classList.add('hidden'); const d = JSON.parse(e.data); const s=d.summary; const total=s.high+s.medium+s.low+s.none; let msg = '<b>Checked '+total+' items.</b><br><span class="ok">'+s.high+' high confidence</span> (auto-imported), <span class="warn">'+s.medium+' medium confidence</span> (review), '+s.low+' low + '+s.none+' no-match (skipped)'; if(s.errors) msg += ', '+s.errors+' errors'; msg += '.<br>'; if(d.cancelled) msg += '<span class="warn">Run cancelled — partial results above.</span> '; if(d.mode==='commit'){ msg += '<b class="ok">Added '+d.added.episodes+' episodes + '+d.added.movies+' movies to Trakt.</b>'; } else { msg += 'Would import <b>'+d.wouldWrite.episodes+' episodes + '+d.wouldWrite.movies+' movies</b>. Click <b>Import to Trakt</b> to apply.'; } $('#summary').innerHTML = msg; $('#runState').textContent = d.cancelled ? 'Cancelled' : 'Done'; updateButtons(); });
+  es.addEventListener('fatal', e=>{ es.close(); $('#cancel').classList.add('hidden'); const d=JSON.parse(e.data); $('#summary').innerHTML = '<span class="err">'+d.error+'</span>'; $('#runState').textContent='Error'; updateButtons(); });
+  es.onerror = ()=>{ es.close(); $('#cancel').classList.add('hidden'); $('#runState').textContent='Finished'; updateButtons(); };
+}
+$('#dry').onclick = ()=> runMode('dry-run');
+$('#commit').onclick = ()=>{ if(confirm('Import high-confidence matches to your Trakt account now?')) runMode('commit'); };
+$('#cancel').onclick = async ()=>{ $('#runState').textContent='Cancelling…'; try { await fetch('/api/cancel',{method:'POST'}); } catch (e) {} };
+
+setService('netflix');
+</script>
+</body>
+</html>

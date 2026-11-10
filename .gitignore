@@ -1,0 +1,16 @@
+# Secrets - created by the app at runtime. NEVER commit.
+config.json
+token.json
+.env
+
+# Personal watch-history exports
+*.csv
+*history*.json
+NetflixViewingActivity*
+exports/
+
+# Node / OS noise
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crunchyroll export guide</title>
+<style>
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif; background:#0f1420; color:#e8edf6; line-height:1.6; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 24px 80px; }
+  h1 { font-size:22px; } h2 { font-size:17px; margin-top:28px; color:#ffd; }
+  .step { color:#e0203c; font-weight:700; }
+  code { background:#0a0f1a; border:1px solid #223; border-radius:6px; padding:2px 6px; }
+  .card { background:#1a2233; border:1px solid #263149; border-radius:12px; padding:16px 20px; margin:16px 0; }
+  .tip { color:#9fb0c9; font-size:13px; } .warn { color:#f1c40f; }
+  a { color:#7db1ff; } button { padding:8px 14px; border:0; border-radius:8px; background:#e0203c; color:#fff; font-weight:600; cursor:pointer; }
+  ol { padding-left:20px; } li { margin:6px 0; } kbd { background:#222d45; border-radius:5px; padding:1px 6px; border:1px solid #33436a; font-size:12px; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <h1>Crunchyroll &rarr; Trakt: getting your history file</h1>
+  <p class="tip">Crunchyroll has no download button, so we read it from your logged-in session. Just copy-paste, ~2 minutes. Nothing is sent anywhere except back to you as a file.</p>
+
+  <div class="card">
+    <h2><span class="step">Step 1.</span> Open your Crunchyroll history</h2>
+    <ol>
+      <li>Go to <a href="https://www.crunchyroll.com/history" target="_blank">crunchyroll.com/history</a> and make sure you are <b>logged in</b>.</li>
+      <li>Press <kbd>F12</kbd> to open Developer Tools.</li>
+      <li>Click the <b>Network</b> tab.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">Step 2.</span> Find your two values</h2>
+    <ol>
+      <li>In the Network filter box, type: <code>watch-history</code></li>
+      <li>Press <kbd>F5</kbd> to refresh. Click the <code>watch-history?...</code> row.</li>
+      <li>In <b>Headers</b>, note:
+        <ul>
+          <li><b>Account ID</b> — in the <b>Request URL</b>, the long id between <code>/content/v2/</code> and <code>/watch-history</code>.</li>
+          <li><b>Authorization</b> — the header starting with <code>Bearer eyJ...</code> (copy the whole value).</li>
+        </ul>
+      </li>
+    </ol>
+    <p class="warn">These expire in a few minutes — continue promptly. A 401 just means they expired; refresh and grab them again.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">Step 3.</span> Build &amp; copy your script (in the app)</h2>
+    <ol>
+      <li>Back in the app, select <b>Crunchyroll</b>, paste your <b>Account ID</b> and <b>Authorization</b> into the two boxes.</li>
+      <li>Click <b>Build my script</b>, then <b>Copy script</b>. Your values are already inside.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">Step 4.</span> Run it</h2>
+    <ol>
+      <li>Back on Crunchyroll, click the <b>Console</b> tab.</li>
+      <li><b>Paste</b> the copied script and press <kbd>Enter</kbd>.</li>
+      <li>It downloads <code>crunchyroll-history-full.json</code> to your Downloads.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">Step 5.</span> Upload it</h2>
+    <p>Back in the app (Crunchyroll selected), drag in <code>crunchyroll-history-full.json</code>. Then Preview &rarr; Import. Done! &#127881;</p>
+    <p><a href="/"><button>&larr; Back to the app</button></a></p>
+  </div>
+</div>
+</body>
+</html>
