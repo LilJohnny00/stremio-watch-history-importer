@@ -89,3 +89,8 @@ Netflix and Prime Video history is **per profile**. Export from the profile you 
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Authors Note
+
+Yes, this has been created using AI.
+Will I update this? Probably not, but feel to adjust it yourself for your personal use.
